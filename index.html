@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futures Trading Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        :root {
+            --background: #f3f4f6; /* Light Gray */
+            --sidebar: #ffffff;
+            --card: #ffffff;
+            --border: #e5e7eb;
+            --text-primary: #111827; /* Dark Gray / Black */
+            --text-secondary: #6b7280; /* Medium Gray */
+            --accent: #3b82f6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--text-primary);
+        }
+        .sidebar-link {
+            color: #374151;
+            transition: all 0.2s ease-in-out;
+        }
+        .sidebar-link:hover {
+            background-color: #eff6ff;
+            color: var(--accent);
+        }
+        .sidebar-link.active {
+            background-color: var(--accent);
+            color: #ffffff;
+        }
+        .price-up { color: #16a34a; }
+        .price-down { color: #dc2626; }
+        .loader {
+            border: 4px solid #d1d5db;
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        
+        @keyframes flash-green-bg {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgba(34, 197, 94, 0.1); }
+        }
+        .flash-green { animation: flash-green-bg 1s ease-out; }
+
+        @keyframes flash-red-bg {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgba(239, 68, 68, 0.1); }
+        }
+        .flash-red { animation: flash-red-bg 1s ease-out; }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        input:-webkit-autofill:active {
+            transition: background-color 5000s ease-in-out 0s;
+            -webkit-box-shadow: 0 0 0 40px var(--sidebar) inset !important;
+            -webkit-text-fill-color: var(--text-primary) !important;
+        }
+    </style>
+</head>
+<body class="flex h-screen">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-20 lg:w-64 bg-sidebar flex flex-col items-center lg:items-start p-4 space-y-4 border-r border-border">
+        <div class="flex items-center justify-center lg:justify-start w-full mb-8">
+            <i class="fas fa-rocket text-3xl text-accent"></i>
+            <h1 class="text-2xl font-bold ml-3 hidden lg:block text-gray-800">FuturesSuite</h1>
+        </div>
+        <a href="#" onclick="showPage('scanner')" class="sidebar-link active w-full flex items-center justify-center lg:justify-start p-3 rounded-lg">
+            <i class="fas fa-chart-line fa-fw text-xl"></i>
+            <span class="ml-4 hidden lg:inline font-semibold">Market Scanner</span>
+        </a>
+        <a href="#" onclick="showPage('positions')" class="sidebar-link w-full flex items-center justify-center lg:justify-start p-3 rounded-lg">
+            <i class="fas fa-wallet fa-fw text-xl"></i>
+            <span class="ml-4 hidden lg:inline font-semibold">Positions</span>
+        </a>
+        <a href="#" onclick="showPage('settings')" class="sidebar-link w-full flex items-center justify-center lg:justify-start p-3 rounded-lg">
+            <i class="fas fa-cog fa-fw text-xl"></i>
+            <span class="ml-4 hidden lg:inline font-semibold">Pengaturan</span>
+        </a>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto no-scrollbar">
+        <!-- Market Scanner Page -->
+        <div id="scanner" class="page">
+            <header class="mb-8">
+                <h1 class="text-4xl font-bold text-gray-800">Market Scanner</h1>
+                <p class="text-text-secondary mt-1">Data diperbarui setiap 30 detik.</p>
+            </header>
+            <div class="bg-card p-4 rounded-lg shadow-md border border-border">
+                 <div id="scanner-loading" class="flex justify-center items-center p-16"><div class="loader"></div></div>
+                 <div class="overflow-x-auto">
+                    <table id="crypto-table" class="min-w-full hidden">
+                        <thead class="border-b border-border">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Koin</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Harga</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Kondisi Pasar</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Sinyal Trading (Contoh)</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Sentimen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body" class="divide-y divide-border"></tbody>
+                    </table>
+                 </div>
+            </div>
+        </div>
+
+        <!-- Positions Page -->
+        <div id="positions" class="page hidden">
+            <header class="mb-8">
+                <h1 class="text-4xl font-bold text-gray-800">Futures Positions Tracker</h1>
+                <p class="text-text-secondary mt-1">Lacak posisi, margin, dan P/L Anda secara real-time.</p>
+            </header>
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-card p-6 rounded-lg shadow-md border border-border">
+                    <h3 class="text-text-secondary text-sm">Total Margin Terpakai</h3>
+                    <p id="total-margin" class="text-3xl font-bold mt-2 text-gray-800">$0.00</p>
+                </div>
+                <div class="bg-card p-6 rounded-lg shadow-md border border-border">
+                    <h3 class="text-text-secondary text-sm">Total Unrealized P/L</h3>
+                    <p id="total-pnl" class="text-3xl font-bold mt-2 text-gray-800">$0.00</p>
+                </div>
+                 <div class="bg-card p-6 rounded-lg shadow-md border border-border">
+                    <h3 class="text-text-secondary text-sm">Total P/L (%) thd Margin</h3>
+                    <p id="total-pnl-percent" class="text-3xl font-bold mt-2 text-gray-800">0.00%</p>
+                </div>
+            </div>
+
+            <!-- Open Position Form -->
+            <div class="bg-card p-6 rounded-lg mb-8 shadow-md border border-border">
+                <h2 class="text-xl font-bold mb-4 text-gray-800">Buka Posisi Baru</h2>
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <input id="asset-id" type="text" placeholder="ID Koin (e.g., bitcoin)" class="bg-gray-50 border border-border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900 placeholder:text-gray-500">
+                    <select id="position-type" onchange="updatePositionTypeColor(this)" class="bg-gray-50 border border-border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent font-bold">
+                        <option value="long">LONG</option>
+                        <option value="short">SHORT</option>
+                    </select>
+                    <input id="asset-amount" type="number" placeholder="Ukuran Posisi (Jumlah Koin)" class="bg-gray-50 border border-border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900 placeholder:text-gray-500">
+                    <input id="asset-price" type="number" placeholder="Harga Entry Rata-rata ($)" class="bg-gray-50 border border-border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900 placeholder:text-gray-500">
+                    <input id="asset-leverage" type="number" placeholder="Leverage (e.g., 10)" class="bg-gray-50 border border-border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900 placeholder:text-gray-500">
+                </div>
+                <button onclick="addPosition()" class="mt-4 bg-gray-800 text-white font-bold rounded-lg py-2 px-5 hover:bg-gray-900 transition">Tambah Posisi</button>
+                 <p class="text-xs text-text-secondary mt-2">Gunakan ID dari CoinGecko (contoh: bitcoin, solana, ripple).</p>
+            </div>
+
+            <!-- Positions Table -->
+            <div class="bg-card p-4 rounded-lg shadow-md border border-border">
+                <div id="positions-loading" class="flex justify-center items-center p-16 hidden"><div class="loader"></div></div>
+                <div class="overflow-x-auto">
+                    <table id="positions-table" class="min-w-full">
+                        <thead class="border-b border-border">
+                           <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Posisi</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Ukuran & Entry</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Nilai Posisi</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Margin & Liq. Price (Est)</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Unrealized P/L</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Aksi</th>
+                           </tr>
+                        </thead>
+                        <tbody id="positions-body" class="divide-y divide-border"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Page -->
+        <div id="settings" class="page hidden">
+             <header class="mb-8">
+                <h1 class="text-4xl font-bold text-gray-800">Pengaturan</h1>
+                <p class="text-text-secondary mt-1">Kelola daftar koin untuk Market Scanner.</p>
+            </header>
+            <div class="bg-card p-6 rounded-lg shadow-md border border-border">
+                <h2 class="text-xl font-bold mb-4 text-gray-800">Watchlist Market Scanner</h2>
+                <textarea id="watchlist-input" class="w-full bg-gray-50 border border-border rounded-lg p-3 h-48 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900" placeholder="Masukkan ID koin dipisahkan dengan koma, contoh: bitcoin,ethereum,solana"></textarea>
+                <button onclick="saveWatchlist()" class="mt-4 bg-gray-800 text-white font-bold rounded-lg py-2 px-4 hover:bg-gray-900 transition">Simpan Watchlist</button>
+                 <p class="text-xs text-text-secondary mt-2">Perubahan akan diterapkan saat Anda me-refresh halaman.</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- State & Config ---
+        let state = {
+            currentPage: 'scanner',
+            previousPrices: {},
+            watchlist: JSON.parse(localStorage.getItem('cryptoWatchlist')) || [
+                'bitcoin', 'ethereum', 'solana', 'ripple', 'cardano', 'dogecoin', 
+                'matic-network', 'chainlink', 'binancecoin', 'avalanche-2', 'polkadot', 
+                'tron', 'shiba-inu', 'litecoin', 'uniswap'
+            ],
+            positions: JSON.parse(localStorage.getItem('cryptoPositions')) || []
+        };
+
+        // --- DOM Elements ---
+        const pages = document.querySelectorAll('.page');
+        const sidebarLinks = document.querySelectorAll('.sidebar-link');
+        const scannerLoader = document.getElementById('scanner-loading');
+        const cryptoTable = document.getElementById('crypto-table');
+        const tableBody = document.getElementById('table-body');
+        const positionsLoader = document.getElementById('positions-loading');
+        const positionsTable = document.getElementById('positions-table');
+        const positionsBody = document.getElementById('positions-body');
+        const watchlistInput = document.getElementById('watchlist-input');
+        
+        // --- Page Navigation ---
+        function showPage(pageId) {
+            state.currentPage = pageId;
+            pages.forEach(p => p.classList.add('hidden'));
+            document.getElementById(pageId).classList.remove('hidden');
+
+            sidebarLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('onclick').includes(pageId)) {
+                    link.classList.add('active');
+                }
+            });
+            
+            if(pageId === 'positions') updatePositions();
+        }
+
+        // --- API & Data Fetching ---
+        async function fetchApiData(coinIds) {
+            if (!coinIds || coinIds.length === 0) return [];
+            try {
+                const apiUrl = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinIds.join(',')}&order=market_cap_desc&per_page=250&page=1&sparkline=false`;
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+                return await response.json();
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                return null;
+            }
+        }
+        
+        // --- Market Scanner Logic ---
+        async function updateScanner() {
+            const data = await fetchApiData(state.watchlist);
+            if(scannerLoader) scannerLoader.style.display = 'none';
+            if(cryptoTable) cryptoTable.classList.remove('hidden');
+            if(!data) {
+                tableBody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-red-500">Gagal memuat data. Periksa koneksi atau ID koin di Pengaturan.</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = '';
+            data.forEach(coin => {
+                const { analysis, strategy } = generateSignal(coin);
+                const news = generateNewsSentiment(coin);
+                let animationClass = '';
+                const oldPrice = state.previousPrices[coin.id];
+                const newPrice = coin.current_price;
+                if (oldPrice && newPrice > oldPrice) animationClass = 'flash-green';
+                else if (oldPrice && newPrice < oldPrice) animationClass = 'flash-red';
+                state.previousPrices[coin.id] = newPrice;
+
+                tableBody.innerHTML += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-4"><div class="flex items-center"><img class="h-8 w-8 rounded-full mr-3" src="${coin.image}" alt="${coin.name}"><div class="font-semibold text-gray-800">${coin.name}<div class="text-text-secondary text-xs uppercase">${coin.symbol}</div></div></div></td>
+                        <td class="px-4 py-4 font-semibold ${animationClass}"><div>${formatCurrency(newPrice, newPrice < 1 ? 4 : 2)}</div><div class="text-sm ${coin.price_change_percentage_24h >= 0 ? 'price-up' : 'price-down'}">${coin.price_change_percentage_24h.toFixed(2)}%</div></td>
+                        <td class="px-4 py-4 text-sm font-semibold ${analysis.color}">${analysis.text}</td>
+                        <td class="px-4 py-4 text-xs">
+                            <div class="font-bold text-lg ${strategy.color}">${strategy.position}</div>
+                            ${strategy.position !== 'WAIT' ? `
+                            <div><span class="text-text-secondary">Entry:</span> ~${strategy.entry}</div>
+                            <div><span class="text-text-secondary">TP:</span> ${strategy.tp}</div>
+                            <div><span class="text-text-secondary">SL:</span> ${strategy.sl}</div>
+                            ` : `<div class="text-text-secondary">${strategy.details}</div>`}
+                        </td>
+                        <td class="px-4 py-4 text-xs"><div class="font-semibold ${news.color}">${news.text}</div>${news.link ? `<a href="${news.link}" target="_blank" class="text-accent hover:underline mt-1 inline-block">Cari Berita &rarr;</a>` : ''}</td>
+                    </tr>`;
+            });
+        }
+
+        // --- Positions Logic ---
+        function addPosition() {
+            const id = document.getElementById('asset-id').value.toLowerCase().trim();
+            const type = document.getElementById('position-type').value;
+            const amount = parseFloat(document.getElementById('asset-amount').value);
+            const price = parseFloat(document.getElementById('asset-price').value);
+            const leverage = parseInt(document.getElementById('asset-leverage').value);
+
+            if(!id || !amount || !price || !leverage || amount <= 0 || price <= 0 || leverage < 1) {
+                alert("Harap isi semua kolom dengan data yang valid.");
+                return;
+            }
+            
+            state.positions.push({ id, amount, price, type, leverage, date: new Date().getTime() });
+            savePositions();
+            updatePositions();
+            
+            document.getElementById('asset-id').value = '';
+            document.getElementById('asset-amount').value = '';
+            document.getElementById('asset-price').value = '';
+            document.getElementById('asset-leverage').value = '';
+            const positionTypeSelect = document.getElementById('position-type');
+            positionTypeSelect.value = 'long';
+            updatePositionTypeColor(positionTypeSelect);
+        }
+
+        function removePosition(date) {
+            state.positions = state.positions.filter(p => p.date !== date);
+            savePositions();
+            updatePositions();
+        }
+
+        async function updatePositions() {
+            positionsLoader.classList.remove('hidden');
+            positionsTable.classList.add('hidden');
+            
+            const positionsCoinIds = [...new Set(state.positions.map(p => p.id))];
+            const marketData = await fetchApiData(positionsCoinIds);
+
+            positionsLoader.classList.add('hidden');
+            positionsTable.classList.remove('hidden');
+
+            if (!marketData && positionsCoinIds.length > 0) {
+                positionsBody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-red-500">Gagal memuat data pasar untuk posisi Anda.</td></tr>`;
+                return;
+            }
+            
+            let totalMargin = 0;
+            let totalPnl = 0;
+
+            positionsBody.innerHTML = '';
+            state.positions.forEach(pos => {
+                const coinData = marketData.find(c => c.id === pos.id);
+                if(coinData){
+                    const positionValue = pos.amount * coinData.current_price;
+                    const initialMargin = (pos.amount * pos.price) / pos.leverage;
+                    
+                    let unrealizedPnl = 0;
+                    if (pos.type === 'long') {
+                        unrealizedPnl = (coinData.current_price - pos.price) * pos.amount;
+                    } else { // short
+                        unrealizedPnl = (pos.price - coinData.current_price) * pos.amount;
+                    }
+                    
+                    const pnlPercent = initialMargin > 0 ? (unrealizedPnl / initialMargin) * 100 : 0;
+                    
+                    let liqPrice = 0;
+                    if (pos.type === 'long') {
+                         liqPrice = pos.price * (1 - (1 / pos.leverage));
+                    } else { // short
+                         liqPrice = pos.price * (1 + (1 / pos.leverage));
+                    }
+
+                    totalMargin += initialMargin;
+                    totalPnl += unrealizedPnl;
+
+                    positionsBody.innerHTML += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-4">
+                                <div class="flex items-center">
+                                    <img class="h-8 w-8 rounded-full mr-3" src="${coinData.image}" alt="${coinData.name}">
+                                    <div>
+                                        <div class="font-semibold text-gray-800">${coinData.name}</div>
+                                        <div class="text-xs font-bold ${pos.type === 'long' ? 'text-green-600' : 'text-red-600'}">${pos.type.toUpperCase()} ${pos.leverage}x</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-4 py-4 text-sm"><div>${pos.amount.toLocaleString()} ${coinData.symbol.toUpperCase()}</div><div class="text-xs text-text-secondary">@ ${formatCurrency(pos.price)}</div></td>
+                            <td class="px-4 py-4 text-sm"><div>${formatCurrency(positionValue)}</div><div class="text-xs ${coinData.price_change_percentage_24h >= 0 ? 'price-up' : 'price-down'}">24j: ${coinData.price_change_percentage_24h.toFixed(2)}%</div></td>
+                            <td class="px-4 py-4 text-sm"><div>Margin: ${formatCurrency(initialMargin)}</div><div class="text-xs text-yellow-500 font-semibold">Liq: ~${formatCurrency(liqPrice)}</div></td>
+                            <td class="px-4 py-4 font-semibold ${unrealizedPnl >= 0 ? 'price-up' : 'price-down'}"><div>${formatCurrency(unrealizedPnl)}</div><div>(${pnlPercent.toFixed(2)}%)</div></td>
+                            <td class="px-4 py-4"><button onclick="removePosition(${pos.date})" class="text-gray-400 hover:text-red-600"><i class="fas fa-times-circle"></i></button></td>
+                        </tr>`;
+                }
+            });
+
+            const totalPnlPercent = totalMargin > 0 ? (totalPnl / totalMargin) * 100 : 0;
+            document.getElementById('total-margin').innerText = formatCurrency(totalMargin);
+            document.getElementById('total-pnl').innerText = formatCurrency(totalPnl);
+            document.getElementById('total-pnl-percent').innerText = `${totalPnlPercent.toFixed(2)}%`;
+            document.getElementById('total-pnl').className = `text-3xl font-bold mt-2 ${totalPnl >= 0 ? 'price-up' : 'price-down'}`;
+            document.getElementById('total-pnl-percent').className = `text-3xl font-bold mt-2 ${totalPnl >= 0 ? 'price-up' : 'price-down'}`;
+        }
+
+        function savePositions() {
+            localStorage.setItem('cryptoPositions', JSON.stringify(state.positions));
+        }
+
+        // --- Settings Logic ---
+        function loadWatchlistToSettings() {
+            watchlistInput.value = state.watchlist.join(',');
+        }
+
+        function saveWatchlist() {
+            const newWatchlist = watchlistInput.value.split(',').map(s => s.trim().toLowerCase()).filter(s => s);
+            state.watchlist = newWatchlist;
+            localStorage.setItem('cryptoWatchlist', JSON.stringify(newWatchlist));
+            alert("Watchlist berhasil disimpan! Silakan refresh halaman untuk melihat perubahan.");
+        }
+
+        // --- Helper Functions & Analysis ---
+        function generateSignal(coin) {
+            const { current_price: price, low_24h: low, high_24h: high, price_change_percentage_24h: change } = coin;
+            const pricePrecision = price < 1 ? 4 : 2;
+            let analysis = {}, strategy = {};
+
+            if (change > 1.5) {
+                analysis = { text: "Momentum Bullish 🟢", color: "price-up" };
+                strategy = { 
+                    position: "LONG",
+                    entry: formatCurrency(price, pricePrecision),
+                    tp: formatCurrency(high, pricePrecision),
+                    sl: formatCurrency(low, pricePrecision),
+                    color: "price-up"
+                };
+            } else if (change < -1.5) {
+                analysis = { text: "Momentum Bearish 🔴", color: "price-down" };
+                strategy = { 
+                    position: "SHORT",
+                    entry: formatCurrency(price, pricePrecision),
+                    tp: formatCurrency(low, pricePrecision),
+                    sl: formatCurrency(high, pricePrecision),
+                    color: "price-down"
+                };
+            } else {
+                analysis = { text: "Konsolidasi / Netral ⚪", color: "text-gray-500" };
+                strategy = { 
+                    position: "WAIT",
+                    details: `Tunggu breakout dari range 24 jam.`,
+                    color: "text-text-secondary"
+                };
+            }
+            return { analysis, strategy };
+        }
+        function generateNewsSentiment(coin) {
+            const change = coin.price_change_percentage_24h;
+            const newsQuery = encodeURIComponent(`${coin.name} cryptocurrency`);
+            const newsLink = `https://news.google.com/search?q=${newsQuery}&hl=id`;
+            let sentiment = {};
+            if (change > 10) {
+                sentiment = { text: "Sentimen Sangat Positif", color: "price-up", link: newsLink };
+            } else if (change < -10) {
+                sentiment = { text: "Sentimen Sangat Negatif", color: "price-down", link: newsLink };
+            } else {
+                sentiment = { text: "Netral", color: "text-text-secondary", link: null };
+            }
+            return sentiment;
+        }
+        function formatCurrency(number, digits = 2) {
+            if (number === null || number === undefined) return '$0.00';
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: digits, maximumFractionDigits: 8 }).format(number);
+        }
+
+        function updatePositionTypeColor(selectElement) {
+            if (selectElement.value === 'long') {
+                selectElement.classList.remove('price-down');
+                selectElement.classList.add('price-up');
+            } else {
+                selectElement.classList.remove('price-up');
+                selectElement.classList.add('price-down');
+            }
+        }
+
+        // --- Initialization ---
+        function init() {
+            showPage('scanner');
+            updateScanner();
+            loadWatchlistToSettings();
+            updatePositionTypeColor(document.getElementById('position-type'));
+            setInterval(() => {
+                if (state.currentPage === 'scanner') updateScanner();
+                if (state.currentPage === 'positions') updatePositions();
+            }, 30000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
+
