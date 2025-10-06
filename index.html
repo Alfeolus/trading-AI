@@ -98,7 +98,7 @@
         <!-- Market Scanner Page -->
         <div id="scanner" class="page">
             <header class="mb-8">
-                <h1 class="text-4xl font-bold text-gray-800">Market Scanner</h1>
+                <h1 class="text-4xl font-bold text-gray-800">Binance Futures Scanner</h1>
                 <p class="text-text-secondary mt-1">Data diperbarui setiap 30 detik.</p>
             </header>
             <div class="bg-card p-4 rounded-lg shadow-md border border-border">
@@ -107,11 +107,10 @@
                     <table id="crypto-table" class="min-w-full hidden">
                         <thead class="border-b border-border">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Koin</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Harga & Grafik (7h)</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Pair</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Harga Futures</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Kondisi & Status Entry</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Rencana Trading (Contoh)</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Sentimen Berita</th>
                             </tr>
                         </thead>
                         <tbody id="table-body" class="divide-y divide-border"></tbody>
@@ -146,7 +145,7 @@
             <div class="bg-card p-6 rounded-lg mb-8 shadow-md border border-border">
                 <h2 class="text-xl font-bold mb-4 text-gray-800">Buka Posisi Baru</h2>
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <input id="asset-id" type="text" placeholder="ID Koin (e.g., bitcoin)" class="bg-gray-50 border border-border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900 placeholder:text-gray-500">
+                    <input id="asset-symbol" type="text" placeholder="Simbol (e.g., BTCUSDT)" class="bg-gray-50 border border-border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900 placeholder:text-gray-500">
                     <select id="position-type" onchange="updatePositionTypeColor(this)" class="bg-gray-50 border border-border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent font-bold">
                         <option value="long">LONG</option>
                         <option value="short">SHORT</option>
@@ -156,7 +155,7 @@
                     <input id="asset-leverage" type="number" placeholder="Leverage (e.g., 10)" class="bg-gray-50 border border-border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900 placeholder:text-gray-500">
                 </div>
                 <button onclick="addPosition()" class="mt-4 bg-gray-800 text-white font-bold rounded-lg py-2 px-5 hover:bg-gray-900 transition">Tambah Posisi</button>
-                 <p class="text-xs text-text-secondary mt-2">Gunakan ID dari CoinGecko (contoh: bitcoin, solana, ripple).</p>
+                 <p class="text-xs text-text-secondary mt-2">Gunakan Simbol Binance Futures (contoh: BTCUSDT, ETHUSDT, SOLUSDT).</p>
             </div>
 
             <!-- Positions Table -->
@@ -188,7 +187,7 @@
             </header>
             <div class="bg-card p-6 rounded-lg shadow-md border border-border">
                 <h2 class="text-xl font-bold mb-4 text-gray-800">Watchlist Market Scanner</h2>
-                <textarea id="watchlist-input" class="w-full bg-gray-50 border border-border rounded-lg p-3 h-48 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900" placeholder="Masukkan ID koin dipisahkan dengan koma, contoh: bitcoin,ethereum,solana"></textarea>
+                <textarea id="watchlist-input" class="w-full bg-gray-50 border border-border rounded-lg p-3 h-48 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900" placeholder="Masukkan simbol Binance Futures dipisahkan koma, contoh: BTCUSDT,ETHUSDT,SOLUSDT"></textarea>
                 <button onclick="saveWatchlist()" class="mt-4 bg-gray-800 text-white font-bold rounded-lg py-2 px-4 hover:bg-gray-900 transition">Simpan Watchlist</button>
                  <p class="text-xs text-text-secondary mt-2">Perubahan akan diterapkan saat Anda me-refresh halaman.</p>
             </div>
@@ -197,15 +196,33 @@
 
     <script>
         // --- State & Config ---
+        const COIN_METADATA_MAP = {
+            'BTCUSDT': { id: 'bitcoin', name: 'Bitcoin' },
+            'ETHUSDT': { id: 'ethereum', name: 'Ethereum' },
+            'SOLUSDT': { id: 'solana', name: 'Solana' },
+            'XRPUSDT': { id: 'ripple', name: 'XRP' },
+            'ADAUSDT': { id: 'cardano', name: 'Cardano' },
+            'DOGEUSDT': { id: 'dogecoin', name: 'Dogecoin' },
+            'MATICUSDT': { id: 'matic-network', name: 'Polygon' },
+            'LINKUSDT': { id: 'chainlink', name: 'Chainlink' },
+            'BNBUSDT': { id: 'binancecoin', name: 'BNB' },
+            'AVAXUSDT': { id: 'avalanche-2', name: 'Avalanche' },
+            'DOTUSDT': { id: 'polkadot', name: 'Polkadot' },
+            'TRXUSDT': { id: 'tron', name: 'TRON' },
+            'SHIBUSDT': { id: 'shiba-inu', name: 'Shiba Inu' },
+            'LTCUSDT': { id: 'litecoin', name: 'Litecoin' },
+            'UNIUSDT': { id: 'uniswap', name: 'Uniswap' }
+        };
+
         let state = {
             currentPage: 'scanner',
             previousPrices: {},
             watchlist: JSON.parse(localStorage.getItem('cryptoWatchlist')) || [
-                'bitcoin', 'ethereum', 'solana', 'ripple', 'cardano', 'dogecoin', 
-                'matic-network', 'chainlink', 'binancecoin', 'avalanche-2', 'polkadot', 
-                'tron', 'shiba-inu', 'litecoin', 'uniswap'
+                'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'MATICUSDT', 
+                'LINKUSDT', 'BNBUSDT', 'AVAXUSDT', 'DOTUSDT', 'SHIBUSDT'
             ],
-            positions: JSON.parse(localStorage.getItem('cryptoPositions')) || []
+            positions: JSON.parse(localStorage.getItem('cryptoPositions')) || [],
+            coinMetadata: {}
         };
 
         // --- DOM Elements ---
@@ -236,61 +253,87 @@
         }
 
         // --- API & Data Fetching ---
-        async function fetchApiData(coinIds) {
-            if (!coinIds || coinIds.length === 0) return [];
+        async function fetchFuturesData(symbols) {
             try {
-                const apiUrl = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinIds.join(',')}&order=market_cap_desc&per_page=250&page=1&sparkline=true`;
-                const response = await fetch(apiUrl);
-                if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
-                return await response.json();
+                const url = 'https://fapi.binance.com/fapi/v1/ticker/24hr';
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Binance API Error: ${response.statusText}`);
+                const allTickers = await response.json();
+                
+                // Filter only for the symbols we need from the watchlist or positions
+                const uppercaseSymbols = symbols.map(s => s.toUpperCase());
+                return allTickers.filter(ticker => uppercaseSymbols.includes(ticker.symbol));
             } catch (error) {
-                console.error("Fetch Error:", error);
+                console.error("Fetch Futures Error:", error);
                 return null;
+            }
+        }
+
+        async function fetchCoinMetadata(coinGeckoIds) {
+            if (!coinGeckoIds || coinGeckoIds.length === 0) return {};
+             try {
+                const apiUrl = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinGeckoIds.join(',')}&order=market_cap_desc&per_page=250&page=1&sparkline=false`;
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error(`CoinGecko API Error: ${response.statusText}`);
+                const data = await response.json();
+                const metadata = {};
+                data.forEach(coin => {
+                    metadata[coin.id] = { image: coin.image, name: coin.name, symbol: coin.symbol };
+                });
+                return metadata;
+            } catch (error) {
+                console.error("Fetch Metadata Error:", error);
+                return {};
             }
         }
         
         // --- Market Scanner Logic ---
         async function updateScanner() {
-            const data = await fetchApiData(state.watchlist);
-            if(scannerLoader) scannerLoader.style.display = 'none';
-            if(cryptoTable) cryptoTable.classList.remove('hidden');
-            if(!data) {
-                tableBody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-red-500">Gagal memuat data. Periksa koneksi atau ID koin di Pengaturan.</td></tr>`;
+            const futuresData = await fetchFuturesData(state.watchlist);
+
+            if (scannerLoader) scannerLoader.style.display = 'none';
+            if (cryptoTable) cryptoTable.classList.remove('hidden');
+
+            if (!futuresData) {
+                tableBody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-red-500">Gagal memuat data dari Binance Futures.</td></tr>`;
                 return;
             }
 
             tableBody.innerHTML = '';
-            data.forEach(coin => {
-                const { analysis, strategy } = generateSignal(coin);
-                const news = generateNewsSentiment(coin);
+            futuresData.forEach(coin => {
+                // Map Binance data to a structure our functions can use
+                const mappedCoin = {
+                    symbol: coin.symbol,
+                    current_price: parseFloat(coin.lastPrice),
+                    high_24h: parseFloat(coin.highPrice),
+                    low_24h: parseFloat(coin.lowPrice),
+                    price_change_percentage_24h: parseFloat(coin.priceChangePercent)
+                };
+
+                const { analysis, strategy } = generateSignal(mappedCoin);
+                const metadata = state.coinMetadata[COIN_METADATA_MAP[coin.symbol]?.id] || { name: coin.symbol.replace('USDT', ''), image: null };
+                
                 let animationClass = '';
-                const oldPrice = state.previousPrices[coin.id];
-                const newPrice = coin.current_price;
+                const oldPrice = state.previousPrices[coin.symbol];
+                const newPrice = mappedCoin.current_price;
                 if (oldPrice && newPrice > oldPrice) animationClass = 'flash-green';
                 else if (oldPrice && newPrice < oldPrice) animationClass = 'flash-red';
-                state.previousPrices[coin.id] = newPrice;
-                
-                const sparklineSvg = generateSparkline(coin.sparkline_in_7d.price, coin.price_change_percentage_24h);
+                state.previousPrices[coin.symbol] = newPrice;
 
                 tableBody.innerHTML += `
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-4">
                             <div class="flex items-center">
-                                <img class="h-8 w-8 rounded-full mr-3" src="${coin.image}" alt="${coin.name}">
+                                ${metadata.image ? `<img class="h-8 w-8 rounded-full mr-3" src="${metadata.image}" alt="${metadata.name}">` : `<div class="h-8 w-8 rounded-full mr-3 bg-gray-200 flex items-center justify-center font-bold text-gray-500">${metadata.name.charAt(0)}</div>`}
                                 <div>
-                                    <div class="font-semibold text-gray-800">${coin.name}</div>
+                                    <div class="font-semibold text-gray-800">${metadata.name}</div>
                                     <div class="text-text-secondary text-xs uppercase">${coin.symbol}</div>
                                 </div>
                             </div>
                         </td>
-                        <td class="px-4 py-4">
-                            <div class="flex items-center">
-                                <div class="font-semibold ${animationClass}">
-                                    <div>${formatCurrency(newPrice, newPrice < 1 ? 4 : 2)}</div>
-                                    <div class="text-sm ${coin.price_change_percentage_24h >= 0 ? 'price-up' : 'price-down'}">${coin.price_change_percentage_24h.toFixed(2)}%</div>
-                                </div>
-                                <div class="ml-4">${sparklineSvg}</div>
-                            </div>
+                        <td class="px-4 py-4 font-semibold ${animationClass}">
+                            <div>${formatCurrency(newPrice, newPrice < 1 ? 4 : 2)}</div>
+                            <div class="text-sm ${mappedCoin.price_change_percentage_24h >= 0 ? 'price-up' : 'price-down'}">${mappedCoin.price_change_percentage_24h.toFixed(2)}%</div>
                         </td>
                         <td class="px-4 py-4 text-sm">
                             <div class="font-semibold ${analysis.color}">${analysis.text}</div>
@@ -304,32 +347,28 @@
                             <div class="font-semibold ${strategy.rrrWarning ? 'text-yellow-500' : 'text-green-600'}">RRR: ${strategy.rrr} ${strategy.rrrWarning ? '(Kurang Baik)' : ''}</div>
                             ` : `<div class="text-text-secondary">${strategy.details}</div>`}
                         </td>
-                        <td class="px-4 py-4 text-xs">
-                            <div class="font-semibold ${news.color}">${news.text}</div>
-                            ${news.link ? `<a href="${news.link}" target="_blank" class="text-accent hover:underline mt-1 inline-block">Cari Berita &rarr;</a>` : ''}
-                        </td>
                     </tr>`;
             });
         }
 
         // --- Positions Logic ---
         function addPosition() {
-            const id = document.getElementById('asset-id').value.toLowerCase().trim();
+            const symbol = document.getElementById('asset-symbol').value.toUpperCase().trim();
             const type = document.getElementById('position-type').value;
             const amount = parseFloat(document.getElementById('asset-amount').value);
             const price = parseFloat(document.getElementById('asset-price').value);
             const leverage = parseInt(document.getElementById('asset-leverage').value);
 
-            if(!id || !amount || !price || !leverage || amount <= 0 || price <= 0 || leverage < 1) {
+            if(!symbol || !amount || !price || !leverage || amount <= 0 || price <= 0 || leverage < 1) {
                 alert("Harap isi semua kolom dengan data yang valid.");
                 return;
             }
             
-            state.positions.push({ id, amount, price, type, leverage, date: new Date().getTime() });
+            state.positions.push({ symbol, amount, price, type, leverage, date: new Date().getTime() });
             savePositions();
             updatePositions();
             
-            document.getElementById('asset-id').value = '';
+            document.getElementById('asset-symbol').value = '';
             document.getElementById('asset-amount').value = '';
             document.getElementById('asset-price').value = '';
             document.getElementById('asset-leverage').value = '';
@@ -348,13 +387,13 @@
             positionsLoader.classList.remove('hidden');
             positionsTable.classList.add('hidden');
             
-            const positionsCoinIds = [...new Set(state.positions.map(p => p.id))];
-            const marketData = await fetchApiData(positionsCoinIds);
+            const positionsSymbols = [...new Set(state.positions.map(p => p.symbol))];
+            const marketData = await fetchFuturesData(positionsSymbols);
 
             positionsLoader.classList.add('hidden');
             positionsTable.classList.remove('hidden');
 
-            if (!marketData && positionsCoinIds.length > 0) {
+            if (!marketData && positionsSymbols.length > 0) {
                 positionsBody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-red-500">Gagal memuat data pasar untuk posisi Anda.</td></tr>`;
                 return;
             }
@@ -364,16 +403,17 @@
 
             positionsBody.innerHTML = '';
             state.positions.forEach(pos => {
-                const coinData = marketData.find(c => c.id === pos.id);
+                const coinData = marketData.find(c => c.symbol === pos.symbol);
                 if(coinData){
-                    const positionValue = pos.amount * coinData.current_price;
+                    const currentPrice = parseFloat(coinData.lastPrice);
+                    const positionValue = pos.amount * currentPrice;
                     const initialMargin = (pos.amount * pos.price) / pos.leverage;
                     
                     let unrealizedPnl = 0;
                     if (pos.type === 'long') {
-                        unrealizedPnl = (coinData.current_price - pos.price) * pos.amount;
+                        unrealizedPnl = (currentPrice - pos.price) * pos.amount;
                     } else { // short
-                        unrealizedPnl = (pos.price - coinData.current_price) * pos.amount;
+                        unrealizedPnl = (pos.price - currentPrice) * pos.amount;
                     }
                     
                     const pnlPercent = initialMargin > 0 ? (unrealizedPnl / initialMargin) * 100 : 0;
@@ -387,20 +427,22 @@
 
                     totalMargin += initialMargin;
                     totalPnl += unrealizedPnl;
+                    
+                    const metadata = state.coinMetadata[COIN_METADATA_MAP[pos.symbol]?.id] || { name: pos.symbol.replace('USDT', ''), image: null };
 
                     positionsBody.innerHTML += `
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-4">
                                 <div class="flex items-center">
-                                    <img class="h-8 w-8 rounded-full mr-3" src="${coinData.image}" alt="${coinData.name}">
+                                    ${metadata.image ? `<img class="h-8 w-8 rounded-full mr-3" src="${metadata.image}" alt="${metadata.name}">` : `<div class="h-8 w-8 rounded-full mr-3 bg-gray-200 flex items-center justify-center font-bold text-gray-500">${metadata.name.charAt(0)}</div>`}
                                     <div>
-                                        <div class="font-semibold text-gray-800">${coinData.name}</div>
+                                        <div class="font-semibold text-gray-800">${metadata.name}</div>
                                         <div class="text-xs font-bold ${pos.type === 'long' ? 'text-green-600' : 'text-red-600'}">${pos.type.toUpperCase()} ${pos.leverage}x</div>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-4 py-4 text-sm"><div>${pos.amount.toLocaleString()} ${coinData.symbol.toUpperCase()}</div><div class="text-xs text-text-secondary">@ ${formatCurrency(pos.price)}</div></td>
-                            <td class="px-4 py-4 text-sm"><div>${formatCurrency(positionValue)}</div><div class="text-xs ${coinData.price_change_percentage_24h >= 0 ? 'price-up' : 'price-down'}">24j: ${coinData.price_change_percentage_24h.toFixed(2)}%</div></td>
+                            <td class="px-4 py-4 text-sm"><div>${pos.amount.toLocaleString()}</div><div class="text-xs text-text-secondary">@ ${formatCurrency(pos.price)}</div></td>
+                            <td class="px-4 py-4 text-sm"><div>${formatCurrency(positionValue)}</div><div class="text-xs ${parseFloat(coinData.priceChangePercent) >= 0 ? 'price-up' : 'price-down'}">24j: ${parseFloat(coinData.priceChangePercent).toFixed(2)}%</div></td>
                             <td class="px-4 py-4 text-sm"><div>Margin: ${formatCurrency(initialMargin)}</div><div class="text-xs text-yellow-500 font-semibold">Liq: ~${formatCurrency(liqPrice)}</div></td>
                             <td class="px-4 py-4 font-semibold ${unrealizedPnl >= 0 ? 'price-up' : 'price-down'}"><div>${formatCurrency(unrealizedPnl)}</div><div>(${pnlPercent.toFixed(2)}%)</div></td>
                             <td class="px-4 py-4"><button onclick="removePosition(${pos.date})" class="text-gray-400 hover:text-red-600"><i class="fas fa-times-circle"></i></button></td>
@@ -426,36 +468,20 @@
         }
 
         function saveWatchlist() {
-            const newWatchlist = watchlistInput.value.split(',').map(s => s.trim().toLowerCase()).filter(s => s);
+            const newWatchlist = watchlistInput.value.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
             state.watchlist = newWatchlist;
             localStorage.setItem('cryptoWatchlist', JSON.stringify(newWatchlist));
             alert("Watchlist berhasil disimpan! Silakan refresh halaman untuk melihat perubahan.");
         }
 
         // --- Helper Functions & Analysis ---
-        function generateSparkline(data, change) {
-            if (!data || data.length < 2) return `<div class="w-24 h-8 text-xs text-gray-400 flex items-center justify-center">No data</div>`;
-            const width = 100; const height = 30; const strokeWidth = 2;
-            const color = change >= 0 ? '#16a34a' : '#dc2626';
-            const min = Math.min(...data); const max = Math.max(...data);
-            const range = max - min === 0 ? 1 : max - min;
-            const points = data.map((price, index) => {
-                const x = (index / (data.length - 1)) * width;
-                const y = height - ((price - min) / range) * (height - strokeWidth) + (strokeWidth / 2);
-                return `${x.toFixed(2)},${y.toFixed(2)}`;
-            }).join(' ');
-            return `<svg viewBox="0 0 ${width} ${height}" class="w-24 h-8" preserveAspectRatio="none"><polyline fill="none" stroke="${color}" stroke-width="${strokeWidth}" points="${points}"/></svg>`;
-        }
-        
         function generateSignal(coin) {
             const { current_price: price, low_24h: low, high_24h: high, price_change_percentage_24h: change } = coin;
             const pricePrecision = price < 1 ? 4 : 2;
             let analysis = {}, strategy = {};
-
             const range = high - low;
-            const positionInRange = range > 0 ? (price - low) / range : 0.5; // 0 at low, 1 at high
+            const positionInRange = range > 0 ? (price - low) / range : 0.5;
 
-            // 1. Market Condition Analysis
             if (change > 2 && positionInRange > 0.7) {
                 analysis.text = "Uptrend Kuat 🔥"; analysis.color = "price-up";
             } else if (change < -2 && positionInRange < 0.3) {
@@ -468,70 +494,43 @@
                 analysis.text = "Konsolidasi / Netral ⚪"; analysis.color = "text-gray-500";
             }
 
-            // 2. Strategy & Entry Status
             if (analysis.text.includes("Uptrend") || analysis.text.includes("Reversal Naik")) {
-                const entryPrice = price - (price - low) * 0.5; // 50% pullback
+                const entryPrice = price - (price - low) * 0.5;
                 const potentialReward = high - entryPrice;
                 const potentialRisk = entryPrice - low;
                 const rrr = potentialRisk > 0 ? (potentialReward / potentialRisk).toFixed(2) : "∞";
-                
                 strategy = {
                     position: "LONG", entry: formatCurrency(entryPrice, pricePrecision),
                     tp: formatCurrency(high, pricePrecision), sl: formatCurrency(low, pricePrecision),
                     rrr: rrr, rrrWarning: rrr < 1.5, color: "price-up"
                 };
-
-                // Entry Status
-                if (price <= entryPrice * 1.01) { // Within 1% of entry
+                if (price <= entryPrice * 1.01) {
                     analysis.status = "DI ZONA ENTRY"; analysis.statusColor = "text-green-500 animate-pulse";
                 } else if (price > entryPrice) {
                     analysis.status = "Menunggu Pullback..."; analysis.statusColor = "text-gray-500";
                 }
-
             } else if (analysis.text.includes("Downtrend") || analysis.text.includes("Reversal Turun")) {
-                const entryPrice = price + (high - price) * 0.5; // 50% rally
+                const entryPrice = price + (high - price) * 0.5;
                 const potentialReward = entryPrice - low;
                 const potentialRisk = high - entryPrice;
                 const rrr = potentialRisk > 0 ? (potentialReward / potentialRisk).toFixed(2) : "∞";
-
                 strategy = {
                     position: "SHORT", entry: formatCurrency(entryPrice, pricePrecision),
                     tp: formatCurrency(low, pricePrecision), sl: formatCurrency(high, pricePrecision),
                     rrr: rrr, rrrWarning: rrr < 1.5, color: "price-down"
                 };
-                
-                // Entry Status
-                if (price >= entryPrice * 0.99) { // Within 1% of entry
+                if (price >= entryPrice * 0.99) {
                     analysis.status = "DI ZONA ENTRY"; analysis.statusColor = "text-red-500 animate-pulse";
                 } else if (price < entryPrice) {
                     analysis.status = "Menunggu Rally..."; analysis.statusColor = "text-gray-500";
                 }
-
             } else {
-                strategy = { 
-                    position: "WAIT",
-                    details: `Tunggu sinyal tren yang jelas.`,
-                    color: "text-text-secondary"
-                };
+                strategy = { position: "WAIT", details: `Tunggu sinyal tren yang jelas.`, color: "text-text-secondary" };
                 analysis.status = "Tidak Ada Sinyal"; analysis.statusColor = "text-gray-500";
             }
-            
             return { analysis, strategy };
         }
-        function generateNewsSentiment(coin) {
-            const change = coin.price_change_percentage_24h;
-            const newsQuery = encodeURIComponent(`${coin.name} cryptocurrency`);
-            const newsLink = `https://news.google.com/search?q=${newsQuery}&hl=id`;
-            let sentiment = {};
-            if (change > 10) {
-                sentiment = { text: "Sentimen Sangat Positif", color: "price-up", link: newsLink };
-            } else if (change < -10) {
-                sentiment = { text: "Sentimen Sangat Negatif", color: "price-down", link: newsLink };
-            } else {
-                sentiment = { text: "Netral", color: "text-text-secondary", link: null };
-            }
-            return sentiment;
-        }
+        
         function formatCurrency(number, digits = 2) {
             if (number === null || number === undefined) return '$0.00';
             return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: digits, maximumFractionDigits: 8 }).format(number);
@@ -548,8 +547,13 @@
         }
 
         // --- Initialization ---
-        function init() {
+        async function init() {
             showPage('scanner');
+            
+            // Pre-fetch metadata for known coins to make UI faster
+            const knownCoinGeckoIds = Object.values(COIN_METADATA_MAP).map(m => m.id);
+            state.coinMetadata = await fetchCoinMetadata(knownCoinGeckoIds);
+            
             updateScanner();
             loadWatchlistToSettings();
             updatePositionTypeColor(document.getElementById('position-type'));
