@@ -99,7 +99,7 @@
         <div id="scanner" class="page">
             <header class="mb-8">
                 <h1 class="text-4xl font-bold text-gray-800">Binance Futures Scanner</h1>
-                <p class="text-text-secondary mt-1">Data diperbarui setiap 30 detik. Analisa menggunakan Tren MA, Momentum RSI, dan Volume.</p>
+                <p class="text-text-secondary mt-1">Data diperbarui setiap 15 detik. Analisa menggunakan Tren MA, Momentum RSI, dan Volume.</p>
                  <div class="mt-2 text-xs font-semibold text-yellow-600 bg-yellow-100 p-2 rounded-md">
                     <i class="fas fa-exclamation-triangle mr-1"></i> PERINGATAN: Alat ini bersifat edukatif dan BUKAN nasihat keuangan. Selalu lakukan riset Anda sendiri (DYOR).
                 </div>
@@ -503,7 +503,42 @@
             }
         }
         async function updatePositions() {
-            // ... (Fungsi ini tidak diubah)
+             positionsLoader.classList.remove('hidden');
+            positionsTable.classList.add('hidden');
+            const positionsSymbols = [...new Set(state.positions.map(p => p.symbol))];
+            const marketData = await fetchFuturesData(positionsSymbols);
+            positionsLoader.classList.add('hidden');
+            positionsTable.classList.remove('hidden');
+            if (!marketData && positionsSymbols.length > 0) {
+                positionsBody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-red-500">Gagal memuat data pasar.</td></tr>`;
+                return;
+            }
+            let totalMargin = 0; let totalPnl = 0;
+            positionsBody.innerHTML = '';
+            state.positions.forEach(pos => {
+                const coinData = marketData.find(c => c.symbol === pos.symbol);
+                if(coinData){
+                    const currentPrice = parseFloat(coinData.lastPrice);
+                    let unrealizedPnl = 0;
+                    if (pos.type === 'long') unrealizedPnl = (currentPrice - pos.price) * pos.amount;
+                    else unrealizedPnl = (pos.price - currentPrice) * pos.amount;
+                    const pnlPercent = pos.margin > 0 ? (unrealizedPnl / pos.margin) * 100 : 0;
+                    let liqPrice = 0;
+                    if (pos.type === 'long') liqPrice = pos.price * (1 - (1 / pos.leverage));
+                    else liqPrice = pos.price * (1 + (1 / pos.leverage));
+                    totalMargin += pos.margin;
+                    totalPnl += unrealizedPnl;
+                    const metadata = state.coinMetadata[COIN_METADATA_MAP[pos.symbol]?.id] || { name: pos.symbol.replace('USDT', ''), image: null };
+                    const positionAnalysis = generatePositionAnalysis(pnlPercent);
+                    positionsBody.innerHTML += `<tr class="hover:bg-gray-50"><td class="px-4 py-4"><div class="flex items-center">${metadata.image ? `<img class="h-8 w-8 rounded-full mr-3" src="${metadata.image}" alt="${metadata.name}">` : `<div class="h-8 w-8 rounded-full mr-3 bg-gray-200 flex items-center justify-center font-bold text-gray-500">${metadata.name.charAt(0)}</div>`}<div><div class="font-semibold text-gray-800">${metadata.name}</div><div class="text-xs font-bold ${pos.type === 'long' ? 'text-green-600' : 'text-red-600'}">${pos.type.toUpperCase()} ${pos.leverage}x</div></div></div></td><td class="px-4 py-4 text-sm"><div>${pos.amount.toLocaleString()} ${pos.symbol.replace('USDT','')}</div><div class="text-xs text-text-secondary">@ ${formatCurrency(pos.price)}</div></td><td class="px-4 py-4 font-semibold ${unrealizedPnl >= 0 ? 'price-up' : 'price-down'}"><div>${formatCurrency(unrealizedPnl)}</div><div>(${pnlPercent.toFixed(2)}%)</div></td><td class="px-4 py-4 text-sm"><div>Margin: ${formatCurrency(pos.margin)}</div><div class="text-xs text-yellow-500 font-semibold">Liq: ~${formatCurrency(liqPrice)}</div></td><td class="px-4 py-4 text-xs"><div class="font-semibold ${positionAnalysis.color}">${positionAnalysis.status}</div><div class="text-text-secondary">${positionAnalysis.recommendation}</div><button onclick="removePosition(${pos.date})" class="text-gray-400 hover:text-red-600 mt-2"><i class="fas fa-times-circle mr-1"></i>Tutup</button></td></tr>`;
+                }
+            });
+            const totalPnlPercent = totalMargin > 0 ? (totalPnl / totalMargin) * 100 : 0;
+            document.getElementById('total-margin').innerText = formatCurrency(totalMargin);
+            document.getElementById('total-pnl').innerText = formatCurrency(totalPnl);
+            document.getElementById('total-pnl-percent').innerText = `${totalPnlPercent.toFixed(2)}%`;
+            document.getElementById('total-pnl').className = `text-3xl font-bold mt-2 ${totalPnl >= 0 ? 'price-up' : 'price-down'}`;
+            document.getElementById('total-pnl-percent').className = `text-3xl font-bold mt-2 ${totalPnl >= 0 ? 'price-up' : 'price-down'}`;
         }
 
 
@@ -518,7 +553,7 @@
             setInterval(() => {
                 if (state.currentPage === 'scanner') updateScanner();
                 if (state.currentPage === 'positions') updatePositions();
-            }, 30000);
+            }, 15000);
         }
 
         init();
