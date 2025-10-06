@@ -108,10 +108,10 @@
                         <thead class="border-b border-border">
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Koin</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Harga</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Kondisi Pasar</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Sinyal Trading (Contoh)</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Sentimen</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Harga & Grafik (7h)</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Kondisi & Status Entry</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Rencana Trading (Contoh)</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Sentimen Berita</th>
                             </tr>
                         </thead>
                         <tbody id="table-body" class="divide-y divide-border"></tbody>
@@ -122,7 +122,7 @@
 
         <!-- Positions Page -->
         <div id="positions" class="page hidden">
-            <header class="mb-8">
+             <header class="mb-8">
                 <h1 class="text-4xl font-bold text-gray-800">Futures Positions Tracker</h1>
                 <p class="text-text-secondary mt-1">Lacak posisi, margin, dan P/L Anda secara real-time.</p>
             </header>
@@ -239,7 +239,7 @@
         async function fetchApiData(coinIds) {
             if (!coinIds || coinIds.length === 0) return [];
             try {
-                const apiUrl = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinIds.join(',')}&order=market_cap_desc&per_page=250&page=1&sparkline=false`;
+                const apiUrl = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinIds.join(',')}&order=market_cap_desc&per_page=250&page=1&sparkline=true`;
                 const response = await fetch(apiUrl);
                 if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
                 return await response.json();
@@ -269,21 +269,45 @@
                 if (oldPrice && newPrice > oldPrice) animationClass = 'flash-green';
                 else if (oldPrice && newPrice < oldPrice) animationClass = 'flash-red';
                 state.previousPrices[coin.id] = newPrice;
+                
+                const sparklineSvg = generateSparkline(coin.sparkline_in_7d.price, coin.price_change_percentage_24h);
 
                 tableBody.innerHTML += `
                     <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-4"><div class="flex items-center"><img class="h-8 w-8 rounded-full mr-3" src="${coin.image}" alt="${coin.name}"><div class="font-semibold text-gray-800">${coin.name}<div class="text-text-secondary text-xs uppercase">${coin.symbol}</div></div></div></td>
-                        <td class="px-4 py-4 font-semibold ${animationClass}"><div>${formatCurrency(newPrice, newPrice < 1 ? 4 : 2)}</div><div class="text-sm ${coin.price_change_percentage_24h >= 0 ? 'price-up' : 'price-down'}">${coin.price_change_percentage_24h.toFixed(2)}%</div></td>
-                        <td class="px-4 py-4 text-sm font-semibold ${analysis.color}">${analysis.text}</td>
+                        <td class="px-4 py-4">
+                            <div class="flex items-center">
+                                <img class="h-8 w-8 rounded-full mr-3" src="${coin.image}" alt="${coin.name}">
+                                <div>
+                                    <div class="font-semibold text-gray-800">${coin.name}</div>
+                                    <div class="text-text-secondary text-xs uppercase">${coin.symbol}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-4">
+                            <div class="flex items-center">
+                                <div class="font-semibold ${animationClass}">
+                                    <div>${formatCurrency(newPrice, newPrice < 1 ? 4 : 2)}</div>
+                                    <div class="text-sm ${coin.price_change_percentage_24h >= 0 ? 'price-up' : 'price-down'}">${coin.price_change_percentage_24h.toFixed(2)}%</div>
+                                </div>
+                                <div class="ml-4">${sparklineSvg}</div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-4 text-sm">
+                            <div class="font-semibold ${analysis.color}">${analysis.text}</div>
+                            <div class="text-xs font-bold ${analysis.statusColor}">${analysis.status}</div>
+                        </td>
                         <td class="px-4 py-4 text-xs">
                             <div class="font-bold text-lg ${strategy.color}">${strategy.position}</div>
                             ${strategy.position !== 'WAIT' ? `
-                            <div><span class="text-text-secondary">Entry:</span> ~${strategy.entry}</div>
-                            <div><span class="text-text-secondary">TP:</span> ${strategy.tp}</div>
-                            <div><span class="text-text-secondary">SL:</span> ${strategy.sl}</div>
+                            <div><span class="text-text-secondary">Plan Entry:</span> ${strategy.entry}</div>
+                            <div><span class="text-text-secondary">TP:</span> ${strategy.tp} | <span class="text-text-secondary">SL:</span> ${strategy.sl}</div>
+                            <div class="font-semibold ${strategy.rrrWarning ? 'text-yellow-500' : 'text-green-600'}">RRR: ${strategy.rrr} ${strategy.rrrWarning ? '(Kurang Baik)' : ''}</div>
                             ` : `<div class="text-text-secondary">${strategy.details}</div>`}
                         </td>
-                        <td class="px-4 py-4 text-xs"><div class="font-semibold ${news.color}">${news.text}</div>${news.link ? `<a href="${news.link}" target="_blank" class="text-accent hover:underline mt-1 inline-block">Cari Berita &rarr;</a>` : ''}</td>
+                        <td class="px-4 py-4 text-xs">
+                            <div class="font-semibold ${news.color}">${news.text}</div>
+                            ${news.link ? `<a href="${news.link}" target="_blank" class="text-accent hover:underline mt-1 inline-block">Cari Berita &rarr;</a>` : ''}
+                        </td>
                     </tr>`;
             });
         }
@@ -409,37 +433,89 @@
         }
 
         // --- Helper Functions & Analysis ---
+        function generateSparkline(data, change) {
+            if (!data || data.length < 2) return `<div class="w-24 h-8 text-xs text-gray-400 flex items-center justify-center">No data</div>`;
+            const width = 100; const height = 30; const strokeWidth = 2;
+            const color = change >= 0 ? '#16a34a' : '#dc2626';
+            const min = Math.min(...data); const max = Math.max(...data);
+            const range = max - min === 0 ? 1 : max - min;
+            const points = data.map((price, index) => {
+                const x = (index / (data.length - 1)) * width;
+                const y = height - ((price - min) / range) * (height - strokeWidth) + (strokeWidth / 2);
+                return `${x.toFixed(2)},${y.toFixed(2)}`;
+            }).join(' ');
+            return `<svg viewBox="0 0 ${width} ${height}" class="w-24 h-8" preserveAspectRatio="none"><polyline fill="none" stroke="${color}" stroke-width="${strokeWidth}" points="${points}"/></svg>`;
+        }
+        
         function generateSignal(coin) {
             const { current_price: price, low_24h: low, high_24h: high, price_change_percentage_24h: change } = coin;
             const pricePrecision = price < 1 ? 4 : 2;
             let analysis = {}, strategy = {};
 
-            if (change > 1.5) {
-                analysis = { text: "Momentum Bullish 🟢", color: "price-up" };
-                strategy = { 
-                    position: "LONG",
-                    entry: formatCurrency(price, pricePrecision),
-                    tp: formatCurrency(high, pricePrecision),
-                    sl: formatCurrency(low, pricePrecision),
-                    color: "price-up"
-                };
-            } else if (change < -1.5) {
-                analysis = { text: "Momentum Bearish 🔴", color: "price-down" };
-                strategy = { 
-                    position: "SHORT",
-                    entry: formatCurrency(price, pricePrecision),
-                    tp: formatCurrency(low, pricePrecision),
-                    sl: formatCurrency(high, pricePrecision),
-                    color: "price-down"
-                };
+            const range = high - low;
+            const positionInRange = range > 0 ? (price - low) / range : 0.5; // 0 at low, 1 at high
+
+            // 1. Market Condition Analysis
+            if (change > 2 && positionInRange > 0.7) {
+                analysis.text = "Uptrend Kuat 🔥"; analysis.color = "price-up";
+            } else if (change < -2 && positionInRange < 0.3) {
+                analysis.text = "Downtrend Kuat 💀"; analysis.color = "price-down";
+            } else if (change > 1 && positionInRange < 0.4) {
+                analysis.text = "Potensi Reversal Naik ⤴️"; analysis.color = "text-yellow-500";
+            } else if (change < -1 && positionInRange > 0.6) {
+                analysis.text = "Potensi Reversal Turun ⤵️"; analysis.color = "text-yellow-500";
             } else {
-                analysis = { text: "Konsolidasi / Netral ⚪", color: "text-gray-500" };
+                analysis.text = "Konsolidasi / Netral ⚪"; analysis.color = "text-gray-500";
+            }
+
+            // 2. Strategy & Entry Status
+            if (analysis.text.includes("Uptrend") || analysis.text.includes("Reversal Naik")) {
+                const entryPrice = price - (price - low) * 0.5; // 50% pullback
+                const potentialReward = high - entryPrice;
+                const potentialRisk = entryPrice - low;
+                const rrr = potentialRisk > 0 ? (potentialReward / potentialRisk).toFixed(2) : "∞";
+                
+                strategy = {
+                    position: "LONG", entry: formatCurrency(entryPrice, pricePrecision),
+                    tp: formatCurrency(high, pricePrecision), sl: formatCurrency(low, pricePrecision),
+                    rrr: rrr, rrrWarning: rrr < 1.5, color: "price-up"
+                };
+
+                // Entry Status
+                if (price <= entryPrice * 1.01) { // Within 1% of entry
+                    analysis.status = "DI ZONA ENTRY"; analysis.statusColor = "text-green-500 animate-pulse";
+                } else if (price > entryPrice) {
+                    analysis.status = "Menunggu Pullback..."; analysis.statusColor = "text-gray-500";
+                }
+
+            } else if (analysis.text.includes("Downtrend") || analysis.text.includes("Reversal Turun")) {
+                const entryPrice = price + (high - price) * 0.5; // 50% rally
+                const potentialReward = entryPrice - low;
+                const potentialRisk = high - entryPrice;
+                const rrr = potentialRisk > 0 ? (potentialReward / potentialRisk).toFixed(2) : "∞";
+
+                strategy = {
+                    position: "SHORT", entry: formatCurrency(entryPrice, pricePrecision),
+                    tp: formatCurrency(low, pricePrecision), sl: formatCurrency(high, pricePrecision),
+                    rrr: rrr, rrrWarning: rrr < 1.5, color: "price-down"
+                };
+                
+                // Entry Status
+                if (price >= entryPrice * 0.99) { // Within 1% of entry
+                    analysis.status = "DI ZONA ENTRY"; analysis.statusColor = "text-red-500 animate-pulse";
+                } else if (price < entryPrice) {
+                    analysis.status = "Menunggu Rally..."; analysis.statusColor = "text-gray-500";
+                }
+
+            } else {
                 strategy = { 
                     position: "WAIT",
-                    details: `Tunggu breakout dari range 24 jam.`,
+                    details: `Tunggu sinyal tren yang jelas.`,
                     color: "text-text-secondary"
                 };
+                analysis.status = "Tidak Ada Sinyal"; analysis.statusColor = "text-gray-500";
             }
+            
             return { analysis, strategy };
         }
         function generateNewsSentiment(coin) {
